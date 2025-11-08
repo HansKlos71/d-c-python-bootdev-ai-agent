@@ -4,15 +4,48 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from config import system_prompt
-from functions.func_tools import available_functions
+from functions.func_tools import available_functions, call_function
 
+def generate_content(client, messages, verbose=False):
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-001",
+        contents=messages,
+        config=types.GenerateContentConfig(
+            tools=[available_functions],
+            system_instruction=system_prompt,
+        ),
+    )
+    if verbose:   
+        print("Prompt tokens:", response.usage_metadata.prompt_token_count)
+        print("Response tokens:", response.usage_metadata.candidates_token_count)
+        
+    if not response.function_calls:
+        return response.text
+
+    function_responses = []
+    print("Function responses: ")
+    for function_call_part in response.function_calls:
+        function_call_result = call_function(function_call_part, verbose)
+        if (
+            not function_call_result.parts
+            or not function_call_result.parts[0].function_response
+        ):
+            raise Exception("empty function call result")
+        if verbose:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+        function_responses.append(function_call_result.parts[0])
+
+    if not function_responses:
+        raise Exception("no function responses generated, exiting.")
 
 def main():
     load_dotenv() 
     
-    args = sys.argv[1:]
-
-    verbose = True if "--verbose" in args else False
+    verbose = "--verbose" in sys.argv
+    args = []
+    for arg in sys.argv[1:]:
+        if not arg.startswith("--"):
+            args.append(arg)
 
     if not args:
         print("Welcome to the Code Assistant!")
@@ -20,40 +53,19 @@ def main():
         print("")
         sys.exit(1)
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
         
-    user_prompt = args[0]
+    user_prompt = " ".join(args)
     
+    if verbose:
+        print(f"User prompt:, {user_prompt}\n")
+
     messages = [
         types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
     
-    def generate_content(client, messages):
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-001",
-            contents=messages,
-            config=types.GenerateContentConfig(
-                tools=[available_functions],
-                system_instruction=system_prompt,
-            )
-        )
-        if verbose:   
-            print(f"User prompt: {user_prompt}")
-            print("Prompt tokens:", response.usage_metadata.prompt_token_count)
-            print("Response tokens:", response.usage_metadata.candidates_token_count)
-        print("Response:")
-        print(response.text)
-        
-        if len(response.function_calls)>0:
-            for call in response.function_calls:
-                print(f"Calling function: {call.name}({call.args})")
-        else:
-            print(response.text)
-
-
-    generate_content(client, messages)
-
+    generate_content(client, messages, verbose=verbose)
 
 if __name__ == "__main__":
     main()
