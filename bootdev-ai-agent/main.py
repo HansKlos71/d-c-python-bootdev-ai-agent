@@ -15,17 +15,20 @@ def generate_content(client, messages, verbose=False):
             system_instruction=system_prompt,
         ),
     )
-    if verbose:   
+    if verbose:
         print("Prompt tokens:", response.usage_metadata.prompt_token_count)
         print("Response tokens:", response.usage_metadata.candidates_token_count)
-        
+    
+    # If there's no function call, return the text response
     if not response.function_calls:
         return response.text
 
+    # Process function calls
     function_responses = []
     print("Function responses: ")
     for function_call_part in response.function_calls:
         function_call_result = call_function(function_call_part, verbose)
+
         if (
             not function_call_result.parts
             or not function_call_result.parts[0].function_response
@@ -33,6 +36,13 @@ def generate_content(client, messages, verbose=False):
             raise Exception("empty function call result")
         if verbose:
             print(f"-> {function_call_result.parts[0].function_response.response}")
+        
+        messages.append(
+            types.Content(
+                role="user",
+                parts=[function_call_result.parts[0]]
+            )
+        )
         function_responses.append(function_call_result.parts[0])
 
     if not function_responses:
@@ -65,7 +75,16 @@ def main():
         types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
     
-    generate_content(client, messages, verbose=verbose)
+    for iteration in range(20):
+        try:
+            result = generate_content(client, messages, verbose=verbose)
+            if result:
+                print("\nFinal response from AI:")
+                print(result)
+                break
+        except Exception as e:
+            print(f"Error during content generation: {e}")
+            break
 
 if __name__ == "__main__":
     main()
