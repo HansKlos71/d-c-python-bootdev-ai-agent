@@ -21,7 +21,7 @@ class FunctionMapper:
         ]
     
     def get_available_function_map(self):
-        return self.__function_map.keys()
+        return self.__function_map
 
     def get_available_function_schemas(self):
         return self.__function_schemas_map
