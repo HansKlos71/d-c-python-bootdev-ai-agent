@@ -4,14 +4,16 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from config import system_prompt
-from functions.func_tools import available_functions, call_function
+from functions.func_tools import available_functions, FunctionCaller, FunctionMapper
 
 def generate_content(client, messages, verbose=False):
+    function_mapper = FunctionMapper()
+    available_tools = types.Tool(function_declarations=function_mapper.get_available_function_schemas())
     response = client.models.generate_content(
         model="gemini-2.0-flash-001",
         contents=messages,
         config=types.GenerateContentConfig(
-            tools=[available_functions],
+            tools=[available_tools],
             system_instruction=system_prompt,
         ),
     )
@@ -24,10 +26,11 @@ def generate_content(client, messages, verbose=False):
         return response.text
 
     # Process function calls
+    function_caller = FunctionCaller(verbose=verbose)
     function_responses = []
     print("Function responses: ")
     for function_call_part in response.function_calls:
-        function_call_result = call_function(function_call_part, verbose)
+        function_call_result = function_caller.call_function(function_call_part)
 
         if (
             not function_call_result.parts
