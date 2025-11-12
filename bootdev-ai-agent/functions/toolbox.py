@@ -20,7 +20,7 @@ class ToolBase(ABC):
 
 class WriteFileTool(ToolBase):
     def __init__(self):
-        return
+        pass
     
     def get_name(self):
         return "write_file"
@@ -66,7 +66,7 @@ class WriteFileTool(ToolBase):
 
 class RunPythonFileTool(ToolBase):
     def __init__(self):
-        return
+        pass
     
 
     def get_name(self):
@@ -126,7 +126,7 @@ class RunPythonFileTool(ToolBase):
 
 class GetFilesInfoTool(ToolBase):
     def __init__(self):
-        return
+        pass
     
     def get_name(self):
         return "get_files_info"

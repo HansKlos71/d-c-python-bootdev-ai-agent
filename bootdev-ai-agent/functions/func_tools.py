@@ -1,30 +1,34 @@
-from .get_files_info import scheme_get_files_info, get_files_info
-from .get_file_content import scheme_get_file_content, get_file_content
-from .run_python_files import scheme_run_python_file, run_python_file
-from .write_file import scheme_write_file, write_file
 from google.genai import types
 from config import WORKING_DIR
+from .toolbox import (
+    GetFilesInfoTool,
+    GetFileContentTool,
+    RunPythonFileTool,
+    WriteFileTool,
+)
 
-class FunctionMapper:
+
+class ToolMapper:
     def __init__(self):
-        self.__function_map = {
-            "get_files_info": get_files_info,
-            "get_file_content": get_file_content,
-            "run_python_file": run_python_file,
-            "write_file": write_file,
+        self.__tools = {
+            "get_files_info": GetFilesInfoTool(),
+            "get_file_content": GetFileContentTool(),
+            "run_python_file": RunPythonFileTool(),
+            "write_file": WriteFileTool(),
         }
-        self.__function_schemas_map =[
-            scheme_get_files_info,
-            scheme_get_file_content,
-            scheme_run_python_file,
-            scheme_write_file,
+        self.__tool_schemas_map =[
+            tool.get_schema() for tool in self.__tools.values()
         ]
     
     def get_available_function_map(self):
-        return self.__function_map
+        return self.__tools
 
     def get_available_function_schemas(self):
-        return self.__function_schemas_map
+        return self.__tool_schemas_map
+
+
+class FunctionMapper(ToolMapper):
+    pass
 
 
 class FunctionCaller:
@@ -53,7 +57,9 @@ class FunctionCaller:
             )
         args = dict(function_call_part.args)
         args["working_directory"] = WORKING_DIR
-        function_result = function_map[function_name](**args)
+        print("calling!")
+        print(f" - with args: {args}")
+        function_result = function_map[function_name].call(**args)
         return types.Content(
             role="tool",
             parts=[
