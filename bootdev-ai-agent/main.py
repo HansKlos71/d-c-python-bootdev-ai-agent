@@ -4,55 +4,61 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from config import system_prompt
-from functions.func_tools import FunctionCaller, FunctionMapper
+from functions.services import FunctionCaller, FunctionMapper
 
-def generate_content(client, messages, verbose=False):
-    function_mapper = FunctionMapper()
-    available_tools = types.Tool(
-        function_declarations=function_mapper.get_available_function_schemas()
-    )
-    
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-001",
-        contents=messages,
-        config=types.GenerateContentConfig(
-            tools=[available_tools],
-            system_instruction=system_prompt,
-        ),
-    )
-    if verbose:
-        print("Prompt tokens:", response.usage_metadata.prompt_token_count)
-        print("Response tokens:", response.usage_metadata.candidates_token_count)
-    
-    # If there's no function call, return the text response
-    if not response.function_calls:
-        return response.text
+class ContentGenerator():
+    def __init__(self):
+        pass
 
-    # Process function calls
-    function_caller = FunctionCaller(verbose=verbose)
-    function_responses = []
-    print("Function responses: ")
-    for function_call_part in response.function_calls:
-        function_call_result = function_caller.call_function(function_call_part)
 
-        if (
-            not function_call_result.parts
-            or not function_call_result.parts[0].function_response
-        ):
-            raise Exception("empty function call result")
-        if verbose:
-            print(f"-> {function_call_result.parts[0].function_response.response}")
-        
-        messages.append(
-            types.Content(
-                role="user",
-                parts=[function_call_result.parts[0]]
-            )
+    def generate_content(self, client, messages, verbose=False):
+        function_mapper = FunctionMapper()
+        available_tools = types.Tool(
+            function_declarations=function_mapper.get_available_function_schemas()
         )
-        function_responses.append(function_call_result.parts[0])
+        
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001",
+            contents=messages,
+            config=types.GenerateContentConfig(
+                tools=[available_tools],
+                system_instruction=system_prompt,
+            ),
+        )
+        if verbose:
+            print("Prompt tokens:", response.usage_metadata.prompt_token_count)
+            print("Response tokens:", response.usage_metadata.candidates_token_count)
+        
+        # If there's no function call, return the text response
+        if not response.function_calls:
+            return response.text
 
-    if not function_responses:
-        raise Exception("no function responses generated, exiting.")
+        # Process function calls
+        function_caller = FunctionCaller(verbose=verbose)
+        function_responses = []
+        print("Function responses: ")
+        for function_call_part in response.function_calls:
+            function_call_result = function_caller.call_function(function_call_part)
+
+            if (
+                not function_call_result.parts
+                or not function_call_result.parts[0].function_response
+            ):
+                raise Exception("empty function call result")
+            if verbose:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
+            
+            messages.append(
+                types.Content(
+                    role="user",
+                    parts=[function_call_result.parts[0]]
+                )
+            )
+            function_responses.append(function_call_result.parts[0])
+
+        if not function_responses:
+            raise Exception("no function responses generated, exiting.")
+
 
 def main():
     load_dotenv() 
@@ -80,10 +86,10 @@ def main():
     messages = [
         types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
-    
+    content_service = ContentGenerator()
     for iteration in range(20):
         try:
-            result = generate_content(client, messages, verbose=verbose)
+            result = content_service.generate_content(client, messages, verbose=verbose)
             if result:
                 print("\nFinal response from AI:")
                 print(result)
